@@ -1,0 +1,212 @@
+name: Build InkFlow Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+
+  pull_request:
+    branches: [ main, master ]
+
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Tipo de compilación'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Compilar InkFlow Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # --------------------------------------------------
+      # 1. Código
+      # --------------------------------------------------
+
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+
+
+      # --------------------------------------------------
+      # 2. Node
+      # --------------------------------------------------
+
+      - name: 🟢 Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+
+      # --------------------------------------------------
+      # 3. Java
+      # --------------------------------------------------
+
+      - name: ☕ Configurar Java JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+
+      # --------------------------------------------------
+      # 4. Gradle
+      # --------------------------------------------------
+
+      - name: 🐘 Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+
+      # --------------------------------------------------
+      # 5. Dependencias React
+      # --------------------------------------------------
+
+      - name: 📦 Instalar dependencias
+        run: npm ci
+
+
+      # --------------------------------------------------
+      # 6. Compilar React / Vite
+      # --------------------------------------------------
+
+      - name: 🛠️ Compilar aplicación web
+        run: npm run build
+
+
+      # --------------------------------------------------
+      # 7. Comprobar Android SDK
+      # --------------------------------------------------
+
+      - name: 🔍 Comprobar Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+          echo "=== Plataformas instaladas ==="
+          ls -la "$ANDROID_HOME/platforms" || true
+
+          echo "=== Build Tools instaladas ==="
+          ls -la "$ANDROID_HOME/build-tools" || true
+
+
+      # --------------------------------------------------
+      # 8. Capacitor
+      # --------------------------------------------------
+
+      - name: 🔄 Sincronizar Capacitor
+        run: npx cap sync android
+
+
+      # --------------------------------------------------
+      # 9. Gradle
+      # --------------------------------------------------
+
+      - name: 🔑 Dar permisos a Gradle
+        run: chmod +x android/gradlew
+
+
+      # --------------------------------------------------
+      # 10. Compilar APK DEBUG
+      # --------------------------------------------------
+
+      - name: 📱 Compilar APK Debug
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'release'
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+
+      # --------------------------------------------------
+      # 11. Compilar APK RELEASE
+      # --------------------------------------------------
+
+      - name: 📱 Compilar APK Release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
+        working-directory: android
+        run: ./gradlew assembleRelease --stacktrace
+
+
+      # --------------------------------------------------
+      # 12. Preparar APK Debug
+      # --------------------------------------------------
+
+      - name: 📦 Preparar APK Debug
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'release'
+        run: |
+          mkdir -p build-output
+
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             build-output/InkFlow-debug.apk
+
+          ls -lh build-output/
+
+
+      # --------------------------------------------------
+      # 13. Preparar APK Release
+      # --------------------------------------------------
+
+      - name: 📦 Preparar APK Release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
+        run: |
+          mkdir -p build-output
+
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk \
+               build-output/InkFlow-release.apk
+
+          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk \
+               build-output/InkFlow-release-unsigned.apk
+
+          else
+            echo "No se encontró el APK Release"
+            exit 1
+          fi
+
+          ls -lh build-output/
+
+
+      # --------------------------------------------------
+      # 14. Verificar APK
+      # --------------------------------------------------
+
+      - name: 🔎 Verificar APK generado
+        run: |
+          echo "APK generado:"
+          find build-output -type f -name "*.apk" -exec ls -lh {} \;
+
+
+      # --------------------------------------------------
+      # 15. Subir APK como Artifact
+      # --------------------------------------------------
+
+      - name: 📤 Subir APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: InkFlow-APK
+          path: build-output/*.apk
+          retention-days: 30
+
+
+      # --------------------------------------------------
+      # 16. Crear GitHub Release al usar v*
+      # --------------------------------------------------
+
+      - name: 🚀 Crear GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build-output/*.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
