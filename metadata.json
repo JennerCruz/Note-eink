@@ -1,0 +1,6 @@
+{
+  "name": "InkFlow",
+  "description": "Cuaderno digital inteligente con tinta digital, reconocimiento de caligrafía y conversión semántica de notas, tareas y listas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
