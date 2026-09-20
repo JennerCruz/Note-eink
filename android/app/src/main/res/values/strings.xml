@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">note.boox</string>
-    <string name="title_activity_main">note.boox</string>
+    <string name="app_name">InkFlow</string>
+    <string name="title_activity_main">InkFlow</string>
     <string name="package_name">com.notebox.app</string>
     <string name="custom_url_scheme">com.notebox.app</string>
 </resources>
