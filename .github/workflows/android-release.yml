@@ -38,11 +38,8 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
-        run: |
-          sdkmanager "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -54,7 +51,7 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Rename APK
+      - name: Prepare APK
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk \
              Note-eink.apk
@@ -63,4 +60,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: Note-eink.apk
-          generate_release_notes: true
+          generate_release_notes: tru
